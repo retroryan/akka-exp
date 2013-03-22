@@ -11,3 +11,7 @@ project/plugins/project/
 
 # Scala-IDE specific
 .scala_dependencies
+
+# InteliJ Project Files
+.idea/*
+.idea_modules/*
