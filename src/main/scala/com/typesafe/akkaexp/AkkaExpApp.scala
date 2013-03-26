@@ -20,11 +20,10 @@ object AkkaExpApp extends App {
   system.actorOf(Props(new Actor with ActorLogging {
 
     accountBalanceRetriever ! GetCustomerAccountBalances(1)
-    accountBalanceRetriever ! "test send"
 
     override def receive = {
       case message => {
-        log.info(message.toString)
+        log.info("received: " + message.toString)
       }
     }
   }))

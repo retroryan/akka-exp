@@ -56,12 +56,14 @@ class AccountBalanceRetriever(savingsAccounts: ActorRef, checkingAccounts: Actor
         mm <- futMM.mapTo[MoneyMarketAccountBalances]
       } yield AccountBalances(savings.balances, checking.balances, mm.balances)
 
+      sender ! "test 1"
+
       futBalances map (fb => {
-        sender ! "test"
+        sender ! "test 2"
         sender ! fb
         log.info("sent: " + fb)
       })
 
-    case _ => sender ! "verified"
+      sender ! "test 3"
   }
 }
