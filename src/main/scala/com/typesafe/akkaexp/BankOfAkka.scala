@@ -59,9 +59,8 @@ class AccountBalanceRetriever(savingsAccounts: ActorRef, checkingAccounts: Actor
       sender ! "test 1"
 
       futBalances map (fb => {
-        sender ! "test 2"
-        sender ! fb
-        log.info("sent: " + fb)
+        log.info("sender: " + sender + " fb: " + fb)
+        sender ! _
       })
 
       sender ! "test 3"
