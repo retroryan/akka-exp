@@ -4,15 +4,32 @@
 
 package com.typesafe.akkaexp
 
-import akka.actor.{ ActorSystem, Props }
+import akka.actor.{ ActorLogging, Actor, ActorSystem, Props }
 
 object AkkaExpApp extends App {
 
-  val system = ActorSystem("akka-exp-system")
-  val akkaExp = system.actorOf(Props[AkkaExp], "akka-exp")
-  akkaExp ! "Start the experiment!"
+  val system = ActorSystem("BankOfAkka")
 
-  Console.readLine("The enter key will get you out of here!")
+  val savingsAccountProxy = system.actorOf(Props[SavingsAccountProxy], "savingsAccountProxy")
+  val checkingAccountProxy = system.actorOf(Props[CheckingAccountProxy], "checkingAccountProxy")
+  val moneyMarketAccountsProxy = system.actorOf(Props[MoneyMarketAccountsProxy], "moneyMarketAccountsProxy")
+
+  val accountBalanceRetriever = system.actorOf(Props(new AccountBalanceRetriever(savingsAccountProxy, checkingAccountProxy, moneyMarketAccountsProxy)),
+    "accountBalanceRetriever")
+
+  system.actorOf(Props(new Actor with ActorLogging {
+
+    accountBalanceRetriever ! GetCustomerAccountBalances(1)
+    accountBalanceRetriever ! "test send"
+
+    override def receive = {
+      case message => {
+        log.info(message.toString)
+      }
+    }
+  }))
+
+  Console.readLine("The enter key will get you out of here!\n")
   system.shutdown()
 
 }
