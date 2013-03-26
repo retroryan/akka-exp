@@ -6,7 +6,7 @@
     </encoder>
   </appender>
 
-  <logger name="com.typesafe.training.hakkyhour" level="debug" additivity="false">
+  <logger name="com.typesafe.akkaexp" level="debug" additivity="false">
     <appender-ref ref="console" />
   </logger>
 
