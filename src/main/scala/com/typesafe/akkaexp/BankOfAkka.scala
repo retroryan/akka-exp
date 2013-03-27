@@ -1,6 +1,6 @@
 package com.typesafe.akkaexp
 
-import concurrent.{ Promise, ExecutionContext }
+import concurrent.{Promise, ExecutionContext}
 import scala.concurrent.duration._
 import akka.actor._
 import akka.pattern.ask
@@ -11,8 +11,8 @@ import java.util.concurrent.TimeoutException
 case class GetCustomerAccountBalances(id: Long)
 
 case class AccountBalances(checking: Option[List[(Long, BigDecimal)]],
-  savings: Option[List[(Long, BigDecimal)]],
-  moneyMarket: Option[List[(Long, BigDecimal)]])
+                           savings: Option[List[(Long, BigDecimal)]],
+                           moneyMarket: Option[List[(Long, BigDecimal)]])
 
 case class CheckingAccountBalances(balances: Option[List[(Long, BigDecimal)]])
 
@@ -37,7 +37,7 @@ class CheckingAccountProxy extends Actor {
 class MoneyMarketAccountsProxy extends Actor {
   def receive = {
     case GetCustomerAccountBalances(id: Long) =>
-      sender ! MoneyMarketAccountBalances(None)
+      sender ! MoneyMarketAccountBalances(Some(List((3, 15000))))
   }
 }
 
@@ -73,9 +73,20 @@ class AccountBalanceRetriever(savingsAccounts: ActorRef, checkingAccounts: Actor
         }
 
         def sendResults() = {
-          originalSender ! ((promisedResult.future.map(x => x)) recover {
-            case t: TimeoutException => t
-          })
+          log.info("sending results")
+
+          /**
+           * originalSender ! ((promisedResult.future.map(x => x)) recover {
+           * case t: TimeoutException => t
+           * })
+           */
+
+          promisedResult.future.map(
+            originalSender ! _
+          ) recover {
+            case t: TimeoutException => log.info(t.toString)
+          }
+
           //context.system.stop(self)
         }
 
