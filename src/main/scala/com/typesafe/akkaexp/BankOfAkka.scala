@@ -41,25 +41,25 @@ class MoneyMarketAccountsProxy extends Actor {
 }
 
 class AccountBalanceRetriever(savingsAccounts: ActorRef, checkingAccounts: ActorRef, moneyMarketAccounts: ActorRef) extends Actor with ActorLogging {
-  implicit val timeout: Timeout = 100 milliseconds
-  implicit val ec: ExecutionContext = context.dispatcher
+  val checkingBalances, savingsBalances, mmBalances: Option[List[(Long, BigDecimal)]] = None
+  var originalSender: Option[ActorRef] = None
 
   def receive = {
 
     case GetCustomerAccountBalances(id) =>
-      val futSavings = savingsAccounts ? GetCustomerAccountBalances(id)
-      val futChecking = checkingAccounts ? GetCustomerAccountBalances(id)
-      val futMM = moneyMarketAccounts ? GetCustomerAccountBalances(id)
-      val futBalances = for {
-        savings <- futSavings.mapTo[SavingsAccountBalances]
-        checking <- futChecking.mapTo[CheckingAccountBalances]
-        mm <- futMM.mapTo[MoneyMarketAccountBalances]
-      } yield AccountBalances(savings.balances, checking.balances, mm.balances)
+      originalSender = Some(sender)
+      savingsAccounts ! GetCustomerAccountBalances(id)
+      checkingAccounts ! GetCustomerAccountBalances(id)
+      moneyMarketAccounts ! GetCustomerAccountBalances(id)
 
-      //if the original sender is not saved then the sender in the future is actually just
-      //the dead letters mailbox
-      val originalSender = sender
-      futBalances map (originalSender ! _)
+    //The Account Proxies send back  CheckingAccountBalances, etc. and not AccountBalances, so this never gets called.
+    case AccountBalances(cBalances, sBalances, mmBalances) =>
+      (checkingBalances, savingsBalances, mmBalances) match {
+        case (Some(c), Some(s), Some(m)) => originalSender.get ! AccountBalances(checkingBalances, savingsBalances,
+          mmBalances)
+        case _ => originalSender.get ! "Invalid Balance Recieved"
+      }
 
+    case _ => originalSender.get ! "Invalid Message Recieved"
   }
 }
