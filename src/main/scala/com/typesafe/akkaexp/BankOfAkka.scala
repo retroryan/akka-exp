@@ -69,7 +69,7 @@ class AccountBalanceRetriever(savingsAccounts: ActorRef, checkingAccounts: Actor
           case (Some(c), Some(s), Some(m)) =>
             if (promisedResult.trySuccess(AccountBalances(checkingBalances, savingsBalances, mmBalances)))
               sendResults
-          case _ => log.info("invalid message")
+          case error => log.info("invalid message: " + error)
         }
 
         def sendResults() = {
