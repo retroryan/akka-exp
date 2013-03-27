@@ -56,13 +56,10 @@ class AccountBalanceRetriever(savingsAccounts: ActorRef, checkingAccounts: Actor
         mm <- futMM.mapTo[MoneyMarketAccountBalances]
       } yield AccountBalances(savings.balances, checking.balances, mm.balances)
 
-      sender ! "test 1"
+      //if the original sender is not saved then the sender in the future is actually just
+      //the dead letters mailbox
+      val originalSender = sender
+      futBalances map (originalSender ! _)
 
-      futBalances map (fb => {
-        log.info("sender: " + sender + " fb: " + fb)
-        sender ! _
-      })
-
-      sender ! "test 3"
   }
 }
