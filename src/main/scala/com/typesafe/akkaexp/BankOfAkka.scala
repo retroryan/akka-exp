@@ -1,11 +1,12 @@
 package com.typesafe.akkaexp
 
-import scala.concurrent.ExecutionContext
+import concurrent.{ Promise, ExecutionContext }
 import scala.concurrent.duration._
 import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
 import scala.Some
+import java.util.concurrent.TimeoutException
 
 case class GetCustomerAccountBalances(id: Long)
 
@@ -41,44 +42,53 @@ class MoneyMarketAccountsProxy extends Actor {
 }
 
 class AccountBalanceRetriever(savingsAccounts: ActorRef, checkingAccounts: ActorRef, moneyMarketAccounts: ActorRef) extends Actor with ActorLogging {
-  val checkingBalances, savingsBalances, mmBalances: Option[List[(Long, BigDecimal)]] = None
-  var originalSender: Option[ActorRef] = None
 
   def receive = {
     case GetCustomerAccountBalances(id) => {
-      context.actorOf(Props(new Actor() {
-        var checkingBalances, savingsBalances, mmBalances: Option[List[(Long, BigDecimal)]] = None
+      val originalSender = sender
+      log.info("originalSender: " + originalSender)
+      implicit val ec: ExecutionContext = context.dispatcher
 
-        //sender in this context is dead letters, so this doesn't work
-        val originalSender = sender
-        log.info("originalSender =  " + originalSender)
+      context.actorOf(Props(new Actor() with ActorLogging {
+        val promisedResult = Promise[AccountBalances]()
+        var checkingBalances, savingsBalances, mmBalances: Option[List[(Long, BigDecimal)]] = None
 
         def receive = {
           case CheckingAccountBalances(balances) =>
             checkingBalances = balances
-            isDone
+            collectBalances
           case SavingsAccountBalances(balances) =>
             savingsBalances = balances
-            isDone
+            collectBalances
           case MoneyMarketAccountBalances(balances) =>
             mmBalances = balances
-            isDone
+            collectBalances
         }
 
-        //isDone doesn't get sent AccountBalances, but the individual Balances,
-        // so the case statement doesn't work
-        def isDone() = {
-          (checkingBalances, savingsBalances, mmBalances) match {
-            case (Some(c), Some(s), Some(m)) =>
-              originalSender ! AccountBalances(checkingBalances, savingsBalances, mmBalances)
-            //context.system.stop(self)
-            case _ => log.info("invalid message in isDone")
-          }
+        def collectBalances() = (checkingBalances, savingsBalances, mmBalances) match {
+          case (Some(c), Some(s), Some(m)) =>
+            if (promisedResult.trySuccess(AccountBalances(checkingBalances, savingsBalances, mmBalances)))
+              sendResults
+          case _ => log.info("invalid message")
+        }
+
+        def sendResults() = {
+          originalSender ! ((promisedResult.future.map(x => x)) recover {
+            case t: TimeoutException => t
+          })
+          //context.system.stop(self)
         }
 
         savingsAccounts ! GetCustomerAccountBalances(id)
         checkingAccounts ! GetCustomerAccountBalances(id)
         moneyMarketAccounts ! GetCustomerAccountBalances(id)
+
+        context.system.scheduler.scheduleOnce(250 milliseconds) {
+          if (promisedResult.tryFailure(new TimeoutException)) {
+            originalSender ! promisedResult.future
+            //context.system.stop(self) // ADD THIS LINE
+          }
+        }
       }))
     }
   }
